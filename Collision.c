@@ -9,7 +9,7 @@
 #include "glut.h"	// OpenGL Graphics Utility Library
 #include "Vector3D.h";
 
-#define PARTICLES_NUMBER 30
+#define PARTICLES_NUMBER 1000
 #define PARTICLE_RADIUS 1
 #define BOX_SIZE 200
 
@@ -127,9 +127,9 @@ static void DetectCollision()
 	{
 		//Acumulates the velocities sums for each axis. 
 		//The result velocity of an axis for a given particle is the sum of this axis velocity with the velocities of the same axis for each colliding particle.
-		float sumvx = particles[i].vx;
-		float sumvy = particles[i].vy;
-		float sumvz = particles[i].vz;
+		float sumvx = 0.0;
+		float sumvy = 0.0;
+		float sumvz = 0.0;
 		
 		//Iterates through all particles.
 		for (j = 0; j < PARTICLES_NUMBER; j++)
@@ -152,9 +152,19 @@ static void DetectCollision()
 			}
 		}
 		//Stores the results in the temporary array.
-		velocities[i].x = sumvx;
-		velocities[i].y = sumvy;
-		velocities[i].z = sumvz;		
+		if (sumvx > 0)
+			velocities[i].x = (particles[i].vx - sumvx) - particles[i].vx;
+		else
+			velocities[i].x = particles[i].vx;
+		if (sumvy > 0)
+			velocities[i].y = (particles[i].vy - sumvy) - particles[i].vy;
+		else
+			velocities[i].y = particles[i].vy;
+		if (sumvz > 0)
+			velocities[i].z = (particles[i].vz - sumvz) - particles[i].vz;
+		else
+			velocities[i].z = particles[i].vz;
+
 	}
 
 	//Stores the results in the temporary array back in the particles array.
