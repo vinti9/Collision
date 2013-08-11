@@ -9,18 +9,14 @@
 #include "glut.h"	// OpenGL Graphics Utility Library
 #include "Vector3D.h";
 
-#define PARTICLES_NUMBER 100
+#define PARTICLES_NUMBER 30
 #define PARTICLE_RADIUS 1
 #define BOX_SIZE 200
 
 static GLenum spinMode = GL_TRUE;
 static GLenum singleStep = GL_FALSE;
 
-static float AnimateIncrement;
-static float boxSize = BOX_SIZE;
-static int particlesNumber = PARTICLES_NUMBER;
 static struct particle particles[PARTICLES_NUMBER];
-static float PI = 3.1415;
 
 // glutKeyboardFunc is called below to set this function to handle
 //		all normal key presses.  
@@ -40,22 +36,6 @@ static void KeyPressFunc( unsigned char Key, int x, int y )
 	}
 }
 
-// glutSpecialFunc is called below to set this function to handle
-//		all special key presses.  See glut.h for the names of
-//		special keys.
-static void SpecialKeyFunc( int Key, int x, int y )
-{
-	switch ( Key ) {
-	case GLUT_KEY_UP:		
-		Key_up();
-		break;
-	case GLUT_KEY_DOWN:
-		Key_down();
-		break;
-	}
-}
-
-
 static void Key_r(void)
 {
 	if ( singleStep ) {			// If ending single step mode
@@ -73,26 +53,11 @@ static void Key_s(void)
 	spinMode = GL_TRUE;
 }
 
-static void Key_up(void)
-{
-    AnimateIncrement *= 2.0;			// Double the animation time step
-}
-
-static void Key_down(void)
-{
-    AnimateIncrement /= 2.0;			// Halve the animation time step	
-}
-
-/*
- * Animate() handles the animation and the redrawing of the
- *		graphics window contents.
- */
-
 static int existsParticleInPos(int i, float x, float y, float z)
 {
 	int result = 0;
 	int j;
-	for (j = 0; j < particlesNumber; j++)
+	for (j = 0; j < PARTICLES_NUMBER; j++)
 		{
 			if (i != j)
 			{
@@ -113,7 +78,7 @@ static void CreateParticles()
 {
 	int i;
 	srand((unsigned)(time(0))); 
-	for (i = 0; i < particlesNumber; i++)
+	for (i = 0; i < PARTICLES_NUMBER; i++)
 	{
 		int size = BOX_SIZE;
 		particles[i].x = (gen_rand(size)-(size/2))/1.0;
@@ -137,105 +102,128 @@ static void CreateParticles()
 	}
 }
 
+/*
+ * Draw the particles container.
+ */
 static void DrawBox()
 {
 	glColor3f(255, 255, 255);
-	glutWireCube(boxSize);
+	glutWireCube(BOX_SIZE);
 }
 
+/*
+ * Detects collision between all particles.
+ */
 static void DetectCollision()
 {
 	int i;
 	int j;
+	//Temporary array to store the result velocity (a vector) for each particle.
 	struct Vector3D velocities[PARTICLES_NUMBER];
-	for (i = 0; i < particlesNumber; i++)
+
+	//Calculates the collision between all particles. It's naive because it's a very simplistic approach. 
+	//We could somehow store the particles near each other and only calculate the collision between them.
+	for (i = 0; i < PARTICLES_NUMBER; i++)
 	{
-		float sumvx = 0;
-		float sumvy = 0;
-		float sumvz = 0;
-		for (j = 0; j < particlesNumber; j++)
+		//Acumulates the velocities sums for each axis. 
+		//The result velocity of an axis for a given particle is the sum of this axis velocity with the velocities of the same axis for each colliding particle.
+		float sumvx = particles[i].vx;
+		float sumvy = particles[i].vy;
+		float sumvz = particles[i].vz;
+		
+		//Iterates through all particles.
+		for (j = 0; j < PARTICLES_NUMBER; j++)
 		{
+			//If it's not the current particle.
 			if (i != j)
 			{
+				//Calculates the distance between particles centers.
 				float d = sqrt(pow(particles[i].x - particles[j].x, 2) + 
 					pow(particles[i].y - particles[j].y, 2) +
 					pow(particles[i].z - particles[j].z, 2));
+				//If the distance is equal or less than the sum of the radius, we have a collision.
 				if (d <= particles[i].radius + particles[j].radius)
 				{
+					//Accumulates the velocities sum for each axis.
 					sumvx += particles[j].vx;
 					sumvy += particles[j].vy;
 					sumvz += particles[j].vz;
 				}
 			}
 		}
-		if (sumvx != 0)
-			velocities[i].x = sumvx;
-		else
-			velocities[i].x = particles[i].vx;
-		if (sumvy != 0)
-			velocities[i].y = sumvy;
-		else
-			velocities[i].y = particles[i].vy;
-		if (sumvz != 0)
-			velocities[i].z = sumvz;
-		else
-			velocities[i].z = particles[i].vz;
+		//Stores the results in the temporary array.
+		velocities[i].x = sumvx;
+		velocities[i].y = sumvy;
+		velocities[i].z = sumvz;		
 	}
-	for (i = 0; i < particlesNumber; i++)
+
+	//Stores the results in the temporary array back in the particles array.
+	//Then tests if the particles hit a box face, preventing it from "escaping" from inside the box.
+	for (i = 0; i < PARTICLES_NUMBER; i++)
 	{
+		//Stores calculated velocities back in the particles array.
 		particles[i].vx = velocities[i].x;
 		particles[i].vy = velocities[i].y;
 		particles[i].vz = velocities[i].z;
 
-		if (particles[i].x + particles[i].vx - particles[i].radius < -boxSize/2 || particles[i].x + particles[i].vx + particles[i].radius > boxSize/2)
+		//Tests if a particle is about to extrapolate the box limits.
+		if (particles[i].x + particles[i].vx - particles[i].radius < -BOX_SIZE/2 || particles[i].x + particles[i].vx + particles[i].radius > BOX_SIZE/2)
 		{
-			if (particles[i].x + particles[i].vx - particles[i].radius < -boxSize/2)
+			//If so, tests wether it's a positive or negative limit.
+			if (particles[i].x + particles[i].vx - particles[i].radius < -BOX_SIZE/2)
 			{
 				float offset = 0;
-				particles[i].x = -boxSize/2 + particles[i].radius + offset;
+				//Adjusts the particle position, so it doesn't get out of the box.
+				particles[i].x = -BOX_SIZE/2 + particles[i].radius + offset;
+				//Tests if there are other particles in the adjusted position.
+				while (existsParticleInPos(i, particles[i].x, particles[i].y, particles[i].z))
+				{
+					//If so, we add an offset to the adjusted position.
+					offset += particles[i].radius / 10;
+					particles[i].x = -BOX_SIZE/2 + particles[i].radius + offset;
+				}
+			}
+			else
+			if (particles[i].x + particles[i].vx + particles[i].radius > BOX_SIZE/2)
+			{
+				float offset = 0;
+				particles[i].x = BOX_SIZE/2 - particles[i].radius - offset;
 				while (existsParticleInPos(i, particles[i].x, particles[i].y, particles[i].z))
 				{
 					offset += particles[i].radius / 10;
-					particles[i].x = -boxSize/2 + particles[i].radius + offset;
+					particles[i].x = BOX_SIZE/2 - particles[i].radius - offset;
 				}
 			}
-			if (particles[i].x + particles[i].vx + particles[i].radius > boxSize/2)
-			{
-				float offset = 0;
-				particles[i].x = boxSize/2 - particles[i].radius - offset;
-				while (existsParticleInPos(i, particles[i].x, particles[i].y, particles[i].z))
-				{
-					offset += particles[i].radius / 10;
-					particles[i].x = boxSize/2 - particles[i].radius - offset;
-				}
-			}
-
+			//The particle hit one of the faces, so we need to invert its orientation.
 			particles[i].vx = - particles[i].vx;
 		}
 		else
 		{
+			//The particle didn't hit any faces, so we increase its position according to its velocity.
 			particles[i].x += particles[i].vx;
 		}
-		if (particles[i].y + particles[i].vy - particles[i].radius < -boxSize/2 || particles[i].y + particles[i].vy + particles[i].radius > boxSize/2)
+		//The same for the y axis.
+		if (particles[i].y + particles[i].vy - particles[i].radius < -BOX_SIZE/2 || particles[i].y + particles[i].vy + particles[i].radius > BOX_SIZE/2)
 		{
-			if (particles[i].y + particles[i].vy - particles[i].radius < -boxSize/2)
+			if (particles[i].y + particles[i].vy - particles[i].radius < -BOX_SIZE/2)
 			{
 				float offset = 0;
-				particles[i].y = -boxSize/2 + particles[i].radius + offset;
+				particles[i].y = -BOX_SIZE/2 + particles[i].radius + offset;
 				while (existsParticleInPos(i, particles[i].x, particles[i].y, particles[i].z))
 				{
 					offset += particles[i].radius / 10;
-					particles[i].y = -boxSize/2 + particles[i].radius + offset;
+					particles[i].y = -BOX_SIZE/2 + particles[i].radius + offset;
 				}
 			}
-			if (particles[i].y + particles[i].vy + particles[i].radius > boxSize/2)
+			else
+			if (particles[i].y + particles[i].vy + particles[i].radius > BOX_SIZE/2)
 			{
 				float offset = 0;
-				particles[i].y = boxSize/2 - particles[i].radius - offset;
+				particles[i].y = BOX_SIZE/2 - particles[i].radius - offset;
 				while (existsParticleInPos(i, particles[i].x, particles[i].y, particles[i].z))
 				{
 					offset += particles[i].radius / 10;
-					particles[i].y = boxSize/2 - particles[i].radius - offset;
+					particles[i].y = BOX_SIZE/2 - particles[i].radius - offset;
 				}
 			}
 
@@ -245,26 +233,28 @@ static void DetectCollision()
 		{
 			particles[i].y += particles[i].vy;
 		}
-		if (particles[i].z + particles[i].vz - particles[i].radius < -boxSize/2 || particles[i].z + particles[i].vz + particles[i].radius > boxSize/2)
+		//And for the z axis.
+		if (particles[i].z + particles[i].vz - particles[i].radius < -BOX_SIZE/2 || particles[i].z + particles[i].vz + particles[i].radius > BOX_SIZE/2)
 		{
-			if (particles[i].z + particles[i].vz - particles[i].radius < -boxSize/2)
+			if (particles[i].z + particles[i].vz - particles[i].radius < -BOX_SIZE/2)
 			{
 				float offset = 0;
-				particles[i].z = -boxSize/2 + particles[i].radius + offset;
+				particles[i].z = -BOX_SIZE/2 + particles[i].radius + offset;
 				while (existsParticleInPos(i, particles[i].x, particles[i].y, particles[i].z))
 				{
 					offset += particles[i].radius / 10;
-					particles[i].z = -boxSize/2 + particles[i].radius + offset;
+					particles[i].z = -BOX_SIZE/2 + particles[i].radius + offset;
 				}
 			}
-			if (particles[i].z + particles[i].vz + particles[i].radius > boxSize/2)
+			else
+			if (particles[i].z + particles[i].vz + particles[i].radius > BOX_SIZE/2)
 			{
 				float offset = 0;
-				particles[i].z = boxSize/2 - particles[i].radius - offset;
+				particles[i].z = BOX_SIZE/2 - particles[i].radius - offset;
 				while (existsParticleInPos(i, particles[i].x, particles[i].y, particles[i].z))
 				{
 					offset += particles[i].radius / 10;
-					particles[i].z = boxSize/2 - particles[i].radius - offset;
+					particles[i].z = BOX_SIZE/2 - particles[i].radius - offset;
 				}
 			}
 
@@ -277,6 +267,9 @@ static void DetectCollision()
 	}
 }
 
+/*
+ * Render a string onto screen.
+ */
 static void renderBitmapString(
 		float x,
 		float y,
@@ -291,13 +284,17 @@ static void renderBitmapString(
   }
 }
 
+/*
+ * Draw all particles.
+ */
 static void DrawParticles()
 {
 	char text [50];
 	int i;
 	float sumSpeedx = 0;
-	for (i = 0; i < particlesNumber; i++)
+	for (i = 0; i < PARTICLES_NUMBER; i++)
 	{
+		//sums all velocities from all particles. This sum should always be constant.
 		sumSpeedx += abs(particles[i].vx) + abs(particles[i].vy) + abs(particles[i].vz);
 		glPushMatrix();
 		glTranslatef(particles[i].x, particles[i].y, particles[i].z);
@@ -305,11 +302,14 @@ static void DrawParticles()
 		glutSolidSphere(particles[i].radius, particles[i].slices, particles[i].stacks);
 		glPopMatrix();
 	}
-	
+	glColor3f(255.0, 255.0, 255.0);
 	sprintf(text, "Speeds sum: %3.2f", sumSpeedx);
 	renderBitmapString(BOX_SIZE, BOX_SIZE - 50, 0, GLUT_BITMAP_HELVETICA_10, text);
 }
 
+/*
+ * Generate a random int.
+ */
 static int gen_rand(int max)
 {
 	int n;
@@ -317,6 +317,10 @@ static int gen_rand(int max)
 	return(n);
 }
 
+/*
+ * Animate() handles the animation and the redrawing of the
+ *		graphics window contents.
+ */
 static void Animate(void)
 {
 	// Clear the redering window
@@ -397,7 +401,6 @@ int main( int argc, char** argv )
 
 	// Set up callback functions for key presses
 	glutKeyboardFunc( KeyPressFunc );
-	glutSpecialFunc( SpecialKeyFunc );
 
 	// Set up the callback function for resizing windows
     glutReshapeFunc( ResizeWindow );
