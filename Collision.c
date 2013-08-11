@@ -9,7 +9,7 @@
 #include "glut.h"	// OpenGL Graphics Utility Library
 #include "Vector3D.h";
 
-#define PARTICLES_NUMBER 1000
+#define PARTICLES_NUMBER 100
 #define PARTICLE_RADIUS 1
 #define BOX_SIZE 200
 
@@ -96,9 +96,9 @@ static void CreateParticles()
 		particles[i].r = (gen_rand(10))/10.0;
 		particles[i].g = (gen_rand(10))/10.0;
 		particles[i].b = (gen_rand(10))/10.0;
-		particles[i].vx = (gen_rand(10)-5)/1.0;
-		particles[i].vy = (gen_rand(10)-5)/1.0;
-		particles[i].vz = (gen_rand(10)-5)/1.0;
+		particles[i].vx = (gen_rand(10)-5)/10.0;
+		particles[i].vy = (gen_rand(10)-5)/10.0;
+		particles[i].vz = (gen_rand(10)-5)/10.0;
 	}
 }
 
@@ -153,15 +153,15 @@ static void DetectCollision()
 		}
 		//Stores the results in the temporary array.
 		if (sumvx > 0)
-			velocities[i].x = (particles[i].vx - sumvx) - particles[i].vx;
+			velocities[i].x = sumvx;
 		else
 			velocities[i].x = particles[i].vx;
 		if (sumvy > 0)
-			velocities[i].y = (particles[i].vy - sumvy) - particles[i].vy;
+			velocities[i].y = sumvy;
 		else
 			velocities[i].y = particles[i].vy;
 		if (sumvz > 0)
-			velocities[i].z = (particles[i].vz - sumvz) - particles[i].vz;
+			velocities[i].z = sumvz;
 		else
 			velocities[i].z = particles[i].vz;
 
